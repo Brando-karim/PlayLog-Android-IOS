@@ -55,7 +55,11 @@ class PlaylogStore(context: Context) {
         mutate { current ->
             cacheIn(current, game)
             if (status == null) {
-                current.copy(library = current.library.filterNot { it.gameId == game.id })
+                current.copy(
+                    library = current.library.filterNot { it.gameId == game.id },
+                    removedGameIds = (current.removedGameIds + game.id).distinct(),
+                    dirtyGameIds = current.dirtyGameIds - game.id,
+                )
             } else {
                 val old = current.entry(game.id)
                 val entry = LibraryEntry(
@@ -65,7 +69,11 @@ class PlaylogStore(context: Context) {
                     liked = liked ?: old?.liked ?: false,
                     updatedAt = System.currentTimeMillis(),
                 )
-                current.copy(library = current.library.filterNot { it.gameId == game.id } + entry)
+                current.copy(
+                    library = current.library.filterNot { it.gameId == game.id } + entry,
+                    removedGameIds = current.removedGameIds - game.id,
+                    dirtyGameIds = (current.dirtyGameIds + game.id).distinct(),
+                )
             }
         }
     }
@@ -74,12 +82,20 @@ class PlaylogStore(context: Context) {
         mutate { current ->
             val old = current.entry(game.id)
             val entry = if (old == null) {
-                LibraryEntry(game.id, PlayStatus.PLAYED.key, liked = true)
+                LibraryEntry(
+                    gameId = game.id,
+                    status = PlayStatus.PLAYED.key,
+                    liked = true,
+                    updatedAt = System.currentTimeMillis(),
+                )
             } else {
                 old.copy(liked = !old.liked, updatedAt = System.currentTimeMillis())
             }
             cacheIn(
-                current.copy(library = current.library.filterNot { it.gameId == game.id } + entry),
+                current.copy(
+                    library = current.library.filterNot { it.gameId == game.id } + entry,
+                    removedGameIds = current.removedGameIds - game.id,
+                ),
                 game,
             )
         }
@@ -87,12 +103,30 @@ class PlaylogStore(context: Context) {
 
     fun addDiary(entry: DiaryEntry) {
         mutate { current ->
-            current.copy(diary = (current.diary + entry).sortedByDescending { it.playedAt })
+            current.copy(
+                diary = (current.diary + entry).sortedByDescending { it.playedAt },
+                // Re-logging a game gives it a fresh review on the web, so any older
+                // deletion tombstone for this game must not delete that review again.
+                deletedDiaryKeys = current.deletedDiaryKeys.filterNot { key ->
+                    key.substringBefore(':').toLongOrNull() == entry.gameId
+                },
+                dirtyGameIds = (current.dirtyGameIds + entry.gameId).distinct(),
+            )
         }
     }
 
     fun deleteDiary(id: String) {
-        mutate { current -> current.copy(diary = current.diary.filterNot { it.id == id }) }
+        mutate { current ->
+            val removed = current.diary.firstOrNull { it.id == id }
+            current.copy(
+                diary = current.diary.filterNot { it.id == id },
+                deletedDiaryKeys = if (removed == null) {
+                    current.deletedDiaryKeys
+                } else {
+                    (current.deletedDiaryKeys + diarySyncKey(removed.gameId, removed.playedAt)).distinct()
+                },
+            )
+        }
     }
 
     fun createList(name: String, description: String = ""): String {
@@ -135,24 +169,201 @@ class PlaylogStore(context: Context) {
 
     fun toggleFavorite(gameId: Long) {
         mutate { current ->
-            val favorites = if (gameId in current.favorites) {
-                current.favorites - gameId
-            } else {
-                current.favorites + gameId
+            val removing = gameId in current.favorites
+            val next = when {
+                removing -> current.favorites - gameId
+                current.favorites.size < 4 -> current.favorites + gameId
+                else -> current.favorites
             }
-            current.copy(favorites = favorites)
+            current.copy(
+                favorites = next,
+                removedFavoriteIds = if (removing) {
+                    (current.removedFavoriteIds + gameId).distinct()
+                } else {
+                    current.removedFavoriteIds - gameId
+                },
+            )
         }
     }
 
     fun setDisplayName(name: String) {
-        mutate { current -> current.copy(displayName = name.trim().ifBlank { "Player One" }) }
+        mutate { current ->
+            current.copy(
+                displayName = name.trim().ifBlank { "Player One" },
+                displayNameDirty = true,
+            )
+        }
+    }
+
+    fun setAvatarUrl(url: String?) {
+        mutate { current -> current.copy(avatarUrl = url, avatarDirty = true) }
+    }
+
+    fun setAvatarFromCloud(url: String?) {
+        mutate { current ->
+            if (current.avatarUrl == url) current else current.copy(avatarUrl = url)
+        }
+    }
+
+    fun markProfileClean() {
+        mutate { current ->
+            if (!current.displayNameDirty && !current.avatarDirty) {
+                current
+            } else {
+                current.copy(displayNameDirty = false, avatarDirty = false)
+            }
+        }
     }
 
     fun clearLibrary() {
         mutate { current ->
-            current.copy(library = emptyList(), diary = emptyList(), favorites = emptyList())
+            current.copy(
+                library = emptyList(),
+                diary = emptyList(),
+                favorites = emptyList(),
+                removedGameIds = (current.removedGameIds + current.library.map { it.gameId }).distinct(),
+                removedFavoriteIds = (current.removedFavoriteIds + current.favorites).distinct(),
+            )
         }
     }
+
+    /**
+     * Merge a cloud snapshot without discarding local entries that have not been
+     * pushed yet. Games listed in [pending] are owned by this device until the
+     * upload succeeds, so their remote copy is ignored. Everything else adopts
+     * the web copy, which keeps a wrong device clock from hiding web edits.
+     */
+    fun mergeRemoteLibrary(entries: List<LibraryEntry>, pending: Set<Long> = emptySet()) {
+        if (entries.isEmpty()) return
+        mutate { current ->
+            val byId = current.library.associateBy { it.gameId }.toMutableMap()
+            entries.forEach { remote ->
+                if (remote.gameId in current.removedGameIds) return@forEach
+                if (remote.gameId in pending || remote.gameId in current.dirtyGameIds) return@forEach
+                val local = byId[remote.gameId]
+                byId[remote.gameId] = remote.copy(liked = local?.liked ?: remote.liked)
+            }
+            current.copy(library = byId.values.toList())
+        }
+    }
+
+    fun mergeRemoteDiary(entries: List<DiaryEntry>, pending: Set<Long> = emptySet()) {
+        if (entries.isEmpty()) return
+        mutate { current ->
+            val remoteIds = entries.map { it.id }.toSet()
+            val byId = current.diary.associateBy { it.id }.toMutableMap()
+            // Prefer a locally-created row when a remote log describes the same day,
+            // so an earlier pull duplicate is merged instead of kept alongside it.
+            // Within a day the newest entry owns the web log.
+            val byKey = current.diary
+                .sortedWith(
+                    compareBy({ if (it.id in remoteIds) 0 else 1 }, { it.playedAt }),
+                )
+                .associateBy { diarySyncKey(it.gameId, it.playedAt) }
+                .toMutableMap()
+            entries.forEach { remote ->
+                if (remote.gameId in pending || remote.gameId in current.dirtyGameIds) return@forEach
+                val key = diarySyncKey(remote.gameId, remote.playedAt)
+                if (key in current.deletedDiaryKeys) return@forEach
+                val existingById = byId[remote.id]
+                val existingByKey = byKey[key]
+                when {
+                    existingById != null -> {
+                        byId[remote.id] = remote.copy(createdAt = existingById.createdAt)
+                        byKey[key] = byId.getValue(remote.id)
+                    }
+
+                    existingByKey != null -> {
+                        // Same game/day is already local but with a locally generated id.
+                        // Refresh its content from the cloud without creating a duplicate.
+                        val refreshed = existingByKey.copy(
+                            gameName = remote.gameName,
+                            coverUrl = remote.coverUrl ?: existingByKey.coverUrl,
+                            rating = remote.rating,
+                            review = remote.review,
+                            status = remote.status,
+                            isReplay = remote.isReplay,
+                            platform = remote.platform,
+                            playtimeHours = remote.playtimeHours,
+                            completion = remote.completion,
+                            tags = remote.tags,
+                            createdAt = existingByKey.createdAt,
+                        )
+                        byId[refreshed.id] = refreshed
+                        byKey[key] = refreshed
+                    }
+
+                    else -> {
+                        byId[remote.id] = remote
+                        byKey[key] = remote
+                    }
+                }
+            }
+            // Drop a pulled copy when a locally-created row already covers the
+            // same game and day (the local row was refreshed above).
+            val localDayKeys = byId.values
+                .filter { it.id !in remoteIds }
+                .map { diarySyncKey(it.gameId, it.playedAt) }
+                .toSet()
+            val merged = byId.values.filterNot { entry ->
+                entry.id in remoteIds &&
+                    diarySyncKey(entry.gameId, entry.playedAt) in localDayKeys
+            }
+            current.copy(diary = merged.sortedByDescending { it.playedAt })
+        }
+    }
+
+    fun mergeRemoteLists(lists: List<GameList>) {
+        if (lists.isEmpty()) return
+        mutate { current ->
+            val byId = current.lists.associateBy { it.id }.toMutableMap()
+            lists.forEach { remote ->
+                val local = byId[remote.id]
+                byId[remote.id] = remote.copy(createdAt = local?.createdAt ?: remote.createdAt)
+            }
+            current.copy(lists = byId.values.toList())
+        }
+    }
+
+    fun mergeRemoteFavorites(ids: List<Long>) {
+        if (ids.isEmpty()) return
+        mutate { current ->
+            val incoming = ids.filterNot { it in current.removedFavoriteIds }
+            current.copy(favorites = (current.favorites + incoming).distinct().take(4))
+        }
+    }
+
+    fun setDisplayNameFromCloud(name: String) {
+        val cleaned = name.trim()
+        if (cleaned.isBlank()) return
+        mutate { current -> current.copy(displayName = cleaned) }
+    }
+
+    fun clearRemovedGame(gameId: Long) {
+        mutate { current -> current.copy(removedGameIds = current.removedGameIds - gameId) }
+    }
+
+    /** Mark games as uploaded so the next pull may adopt their web copy. */
+    fun clearDirtyGames(gameIds: Collection<Long>) {
+        if (gameIds.isEmpty()) return
+        mutate { current ->
+            val next = current.dirtyGameIds - gameIds.toSet()
+            if (next == current.dirtyGameIds) current else current.copy(dirtyGameIds = next)
+        }
+    }
+
+    fun clearRemovedFavorite(gameId: Long) {
+        mutate { current -> current.copy(removedFavoriteIds = current.removedFavoriteIds - gameId) }
+    }
+
+    fun clearDiaryTombstone(gameId: Long, playedAt: Long) {
+        mutate { current ->
+            current.copy(deletedDiaryKeys = current.deletedDiaryKeys - diarySyncKey(gameId, playedAt))
+        }
+    }
+
+    /** Cache games supplied by the cloud without triggering a write when nothing changed. */
+    fun cacheRemoteGames(games: List<Game>) = cacheGames(games)
 
     private fun cacheIn(state: PersistedState, game: Game): PersistedState =
         if (state.game(game.id) == game) state

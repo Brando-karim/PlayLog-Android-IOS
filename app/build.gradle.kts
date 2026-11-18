@@ -23,11 +23,13 @@ android {
         applicationId = "com.playlog.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 4
+        versionName = "1.3.0"
 
         buildConfigField("String", "IGDB_CLIENT_ID", "\"${secret("IGDB_CLIENT_ID")}\"")
         buildConfigField("String", "IGDB_CLIENT_SECRET", "\"${secret("IGDB_CLIENT_SECRET")}\"")
+        buildConfigField("String", "SUPABASE_URL", "\"${secret("SUPABASE_URL")}\"")
+        buildConfigField("String", "SUPABASE_ANON_KEY", "\"${secret("SUPABASE_ANON_KEY")}\"")
     }
 
     buildFeatures {
@@ -70,7 +72,6 @@ dependencies {
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.compose.foundation:foundation")
 
     implementation("androidx.navigation:navigation-compose:2.9.3")

@@ -3,6 +3,7 @@ package com.playlog.app.ui.screens
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -39,7 +40,7 @@ import com.playlog.app.ui.theme.MintWhite
 import com.playlog.app.ui.theme.Sage
 
 private enum class LibraryFilter(val label: String) {
-    ALL("All"), PLAYING("Playing"), PLAYED("Played"), BACKLOG("Backlog"), DROPPED("Dropped"), LIKED("Liked")
+    ALL("All"), PLAYING("Playing"), PLAYED("Played"), BACKLOG("Watchlist"), DROPPED("Dropped"), LIKED("Liked")
 }
 
 @Composable
@@ -80,7 +81,7 @@ fun LibraryScreen(
                     color = MintWhite,
                 )
                 Text(
-                    text = "${snapshot.library.size} games",
+                    text = "${snapshot.library.size} ${if (snapshot.library.size == 1) "game" else "games"}",
                     style = MaterialTheme.typography.labelSmall,
                     color = Sage,
                 )
@@ -92,9 +93,13 @@ fun LibraryScreen(
                 color = Sage,
             )
             Spacer(Modifier.height(18.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(LibraryFilter.entries.size) { index ->
-                    val option = LibraryFilter.entries[index]
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                maxItemsInEachRow = 3,
+            ) {
+                LibraryFilter.entries.forEach { option ->
                     FilterPill(
                         text = option.label,
                         selected = filter == option,
@@ -111,7 +116,7 @@ fun LibraryScreen(
                     icon = painterResource(R.drawable.ic_gamepad),
                     title = if (snapshot.library.isEmpty()) "Your shelves are empty" else "Nothing here yet",
                     message = if (snapshot.library.isEmpty()) {
-                        "Log or backlog a game and it will appear in your library."
+                        "Log or add a game to your watchlist and it will appear in your library."
                     } else {
                         "No games match this filter."
                     },

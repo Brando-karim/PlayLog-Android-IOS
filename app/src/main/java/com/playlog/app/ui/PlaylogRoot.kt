@@ -51,8 +51,10 @@ import androidx.navigation.navArgument
 import com.playlog.app.PlaylogViewModel
 import com.playlog.app.R
 import com.playlog.app.ui.components.AmbientBackground
+import com.playlog.app.ui.screens.AccountScreen
 import com.playlog.app.ui.screens.DiaryScreen
 import com.playlog.app.ui.screens.DiscoverScreen
+import com.playlog.app.ui.screens.EditProfileScreen
 import com.playlog.app.ui.screens.GameDetailScreen
 import com.playlog.app.ui.screens.HomeScreen
 import com.playlog.app.ui.screens.LibraryScreen
@@ -230,11 +232,50 @@ fun PlaylogRoot(vm: PlaylogViewModel = viewModel()) {
                         vm = vm,
                         onGame = { nav.navigate("game/$it") },
                         onDiary = { nav.navigate("diary") },
+                        onList = { nav.navigate("list/$it") },
+                        onLists = {
+                            nav.navigate("lists") {
+                                popUpTo(nav.graph.findStartDestination().id) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                        onLibrary = {
+                            nav.navigate("library") {
+                                popUpTo(nav.graph.findStartDestination().id) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                        onAccount = { nav.navigate("account") },
+                        onSettings = { nav.navigate("settings") },
+                        onEditProfile = { nav.navigate("edit-profile") },
+                    )
+                }
+
+                composable("account") {
+                    AccountScreen(
+                        vm = vm,
+                        onBack = { nav.popBackStack() },
+                        onEditProfile = { nav.navigate("edit-profile") },
+                    )
+                }
+
+                composable("edit-profile") {
+                    EditProfileScreen(
+                        vm = vm,
+                        onBack = { nav.popBackStack() },
+                        onAccount = { nav.navigate("account") },
                     )
                 }
 
                 composable("settings") {
-                    SettingsScreen(vm = vm, onBack = { nav.popBackStack() })
+                    SettingsScreen(
+                        vm = vm,
+                        onBack = { nav.popBackStack() },
+                        onAccount = { nav.navigate("account") },
+                        onEditProfile = { nav.navigate("edit-profile") },
+                    )
                 }
             }
         }

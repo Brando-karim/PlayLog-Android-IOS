@@ -2,6 +2,7 @@ package com.playlog.app.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -228,6 +229,15 @@ fun SearchScreen(
                     text = "Tap a game to add it to ${list.name}",
                     style = MaterialTheme.typography.labelLarge,
                     color = com.playlog.app.ui.theme.PaleMint,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = "Done",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Accent,
+                    modifier = Modifier
+                        .clickable(onClick = onAddedToList)
+                        .padding(start = 10.dp, top = 4.dp, bottom = 4.dp),
                 )
             }
         }
@@ -283,7 +293,6 @@ fun SearchScreen(
                                 onClick = {
                                     if (initialListId != null) {
                                         vm.addGameToList(initialListId, game)
-                                        onAddedToList()
                                     } else {
                                         onGame(game.id)
                                     }

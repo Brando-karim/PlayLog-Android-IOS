@@ -52,7 +52,7 @@ fun DiaryScreen(
         Column(Modifier.padding(horizontal = 20.dp)) {
             Spacer(Modifier.height(4.dp))
             Text(
-                text = "${snapshot.diary.size} entries · $reviewCount reviews",
+                text = "${snapshot.diary.size} ${if (snapshot.diary.size == 1) "entry" else "entries"} · $reviewCount ${if (reviewCount == 1) "review" else "reviews"}",
                 style = MaterialTheme.typography.labelSmall,
                 color = Sage,
             )

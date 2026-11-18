@@ -52,6 +52,10 @@ class GameRepository(
         review: String,
         isReplay: Boolean,
         playedAt: Long,
+        platform: String? = null,
+        playtimeHours: Double? = null,
+        completion: Completion? = null,
+        tags: List<String> = emptyList(),
     ) {
         store.cacheGames(listOf(game))
         store.setStatus(game, status, rating)
@@ -64,6 +68,10 @@ class GameRepository(
             review = review.trim(),
             status = status.key,
             isReplay = isReplay,
+            platform = platform?.trim()?.takeIf { it.isNotBlank() },
+            playtimeHours = playtimeHours,
+            completion = completion?.key,
+            tags = tags,
             playedAt = playedAt,
         )
         store.addDiary(entry)
@@ -95,6 +103,8 @@ class GameRepository(
     fun toggleFavorite(gameId: Long) = store.toggleFavorite(gameId)
 
     fun setDisplayName(name: String) = store.setDisplayName(name)
+
+    fun setAvatarUrl(url: String?) = store.setAvatarUrl(url)
 
     fun clearLibrary() = store.clearLibrary()
 
@@ -130,6 +140,7 @@ class GameRepository(
             averageRating = if (rated.isEmpty()) null else rated.average(),
             ratingHistogram = histogram,
             topGenres = genreCounts,
+            totalHours = snapshot.diary.mapNotNull { it.playtimeHours }.sum(),
         )
     }
 }

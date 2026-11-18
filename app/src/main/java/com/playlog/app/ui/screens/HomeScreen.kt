@@ -138,7 +138,7 @@ fun HomeScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
                 StatCard("Played", stats.played.toString(), Teal, Modifier.weight(1f))
                 StatCard("Playing", stats.playing.toString(), Accent, Modifier.weight(1f))
-                StatCard("Backlog", stats.backlog.toString(), Sage, Modifier.weight(1f))
+                StatCard("Watchlist", stats.backlog.toString(), Sage, Modifier.weight(1f))
             }
             Spacer(Modifier.height(26.dp))
         }
@@ -374,11 +374,20 @@ private fun NowPlayingCard(
                     StatusPill(PlayStatus.PLAYING)
                     if (rating != null) {
                         Spacer(Modifier.width(9.dp))
-                        Text(
-                            text = "★ ${String.format(java.util.Locale.US, "%.1f", rating)}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = PaleMint,
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                painter = painterResource(com.playlog.app.R.drawable.ic_star),
+                                contentDescription = null,
+                                tint = Accent,
+                                modifier = Modifier.size(10.dp),
+                            )
+                            Spacer(Modifier.width(3.dp))
+                            Text(
+                                text = String.format(java.util.Locale.US, "%.1f", rating),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = PaleMint,
+                            )
+                        }
                     }
                 }
             }

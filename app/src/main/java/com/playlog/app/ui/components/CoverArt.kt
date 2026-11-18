@@ -7,7 +7,9 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -208,6 +210,46 @@ fun Monogram(
             fontFamily = SerifDisplay,
             fontWeight = FontWeight.SemiBold,
             fontSize = (size.value * 0.42f).sp,
+        )
+    }
+}
+
+/** Profile portrait: the uploaded avatar when present, with the monogram fallback behind it. */
+@Composable
+fun ProfileAvatar(
+    name: String,
+    avatarUrl: String?,
+    modifier: Modifier = Modifier,
+    size: Dp = 72.dp,
+) {
+    Box(
+        modifier = modifier
+            .size(size)
+            .clip(CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Monogram(name = name, size = size)
+        if (!avatarUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = avatarUrl,
+                contentDescription = "$name profile photo",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        Box(
+            Modifier
+                .fillMaxSize()
+                .border(
+                    1.dp,
+                    Brush.verticalGradient(
+                        listOf(
+                            com.playlog.app.ui.theme.Accent.copy(alpha = 0.62f),
+                            GlassBorder,
+                        ),
+                    ),
+                    CircleShape,
+                ),
         )
     }
 }

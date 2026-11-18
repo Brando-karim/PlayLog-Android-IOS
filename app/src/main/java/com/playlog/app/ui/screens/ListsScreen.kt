@@ -75,7 +75,7 @@ fun ListsScreen(
                 verticalAlignment = Alignment.Bottom,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Column {
+                Column(Modifier.padding(end = 16.dp)) {
                     Text(
                         text = "Lists",
                         style = MaterialTheme.typography.displayMedium,
@@ -83,7 +83,7 @@ fun ListsScreen(
                     )
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        text = "${snapshot.lists.size} curated collections",
+                        text = "${snapshot.lists.size} ${if (snapshot.lists.size == 1) "curated collection" else "curated collections"}",
                         style = MaterialTheme.typography.labelSmall,
                         color = Sage,
                     )
@@ -91,6 +91,7 @@ fun ListsScreen(
                 GlossyPillButton(
                     text = "New",
                     onClick = { showCreate = true },
+                    modifier = Modifier.width(112.dp),
                     compact = true,
                     icon = painterResource(R.drawable.ic_plus),
                 )

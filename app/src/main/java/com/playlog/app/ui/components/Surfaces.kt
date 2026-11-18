@@ -152,7 +152,7 @@ private fun DrawScope.drawAmbientField(breath: Float) {
     val topRadius = size.width * 1.05f
     drawCircle(
         brush = Brush.radialGradient(
-            colors = listOf(Teal.copy(alpha = 0.17f + 0.05f * breath), Color.Transparent),
+            colors = listOf(Teal.copy(alpha = 0.12f + 0.04f * breath), Color.Transparent),
             center = topCenter,
             radius = topRadius,
         ),
@@ -282,8 +282,8 @@ fun GlossyPillButton(
             .shadow(
                 elevation = 14.dp,
                 shape = PillShape,
-                ambientColor = Accent.copy(alpha = 0.55f),
-                spotColor = Accent.copy(alpha = 0.45f),
+                ambientColor = Accent.copy(alpha = 0.32f),
+                spotColor = Accent.copy(alpha = 0.24f),
             )
             .clip(PillShape)
             .background(GlossyBrush)
@@ -405,8 +405,8 @@ fun CircleIconButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     tint: Color = MintWhite,
-    size: Dp = 42.dp,
-    iconSize: Dp = 19.dp,
+    size: Dp = 44.dp,
+    iconSize: Dp = 20.dp,
     accent: Boolean = false,
 ) {
     val interaction = remember { MutableInteractionSource() }
@@ -480,7 +480,7 @@ fun Wordmark(
                 SpanStyle(
                     fontFamily = LibreFranklin,
                     fontWeight = FontWeight.Bold,
-                    letterSpacing = (-0.9).sp,
+                    letterSpacing = (-size * 0.055f).sp,
                 ),
             ) {
                 append("playlog")
@@ -535,7 +535,8 @@ fun SectionHeading(
                     modifier = Modifier
                         .clip(PillShape)
                         .clickable(onClick = onAction)
-                        .padding(start = 10.dp, top = 4.dp, bottom = 4.dp),
+                        .heightIn(min = 38.dp)
+                        .padding(start = 10.dp, end = 2.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -682,9 +683,11 @@ fun PlaylogDialog(
         titleContentColor = MintWhite,
         textContentColor = Sage,
         title = {
-            Kicker("Playlog")
-            Spacer(Modifier.height(6.dp))
-            Text(title, style = MaterialTheme.typography.headlineSmall, color = MintWhite)
+            Column {
+                Kicker("Playlog")
+                Spacer(Modifier.height(6.dp))
+                Text(title, style = MaterialTheme.typography.headlineSmall, color = MintWhite)
+            }
         },
         text = {
             Column { content() }

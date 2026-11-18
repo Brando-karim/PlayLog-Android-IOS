@@ -157,7 +157,7 @@ fun GameDetailScreen(
                         icon = painterResource(R.drawable.ic_arrow_right),
                     )
                     GhostPill(
-                        text = if (status == PlayStatus.BACKLOG) "In backlog" else "Backlog",
+                        text = if (status == PlayStatus.BACKLOG) "In watchlist" else "Watchlist",
                         onClick = { vm.toggleBacklog(game) },
                         selected = status == PlayStatus.BACKLOG,
                     )
@@ -236,8 +236,6 @@ fun GameDetailScreen(
                 kicker = "The ledger",
                 title = "Your history",
                 modifier = Modifier.padding(horizontal = 20.dp),
-                action = "Add to list",
-                onAction = { showLists = true },
             )
             if (diary.isEmpty()) {
                 Text(
@@ -258,17 +256,6 @@ fun GameDetailScreen(
                 }
                 Spacer(Modifier.height(12.dp))
             }
-        }
-
-        item {
-            GhostPill(
-                text = "Add to a list",
-                onClick = { showLists = true },
-                icon = painterResource(R.drawable.ic_plus),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp),
-            )
         }
     }
 

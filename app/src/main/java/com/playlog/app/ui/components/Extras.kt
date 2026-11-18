@@ -31,8 +31,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.playlog.app.R
+import com.playlog.app.data.Completion
 import com.playlog.app.data.DiaryEntry
 import com.playlog.app.data.Game
+import com.playlog.app.data.formatHours
 import com.playlog.app.ui.theme.Accent
 import com.playlog.app.ui.theme.GlassBorder
 import com.playlog.app.ui.theme.MintWhite
@@ -113,6 +115,11 @@ fun DiaryRow(
         name = entry.gameName,
         coverUrl = entry.coverUrl,
     )
+    val details = listOfNotNull(
+        entry.platform,
+        entry.playtimeHours?.let { formatHours(it) },
+        Completion.from(entry.completion)?.label,
+    ).joinToString(" · ")
 
     Row(
         modifier = modifier
@@ -176,6 +183,20 @@ fun DiaryRow(
                         color = PaleMint,
                     )
                 }
+            }
+            if (details.isNotBlank()) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = details,
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                    color = Sage.copy(alpha = 0.9f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (entry.tags.isNotEmpty()) {
+                Spacer(Modifier.height(6.dp))
+                TagRow(entry.tags)
             }
             if (entry.review.isNotBlank()) {
                 Spacer(Modifier.height(6.dp))

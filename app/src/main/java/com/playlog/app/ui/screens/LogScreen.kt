@@ -31,14 +31,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.playlog.app.PlaylogViewModel
 import com.playlog.app.R
+import com.playlog.app.data.Completion
 import com.playlog.app.data.Game
 import com.playlog.app.data.PlayStatus
+import com.playlog.app.data.formatHoursValue
+import com.playlog.app.data.parseTags
 import com.playlog.app.ui.components.BrandLoader
 import com.playlog.app.ui.components.Cover
 import com.playlog.app.ui.components.FilterPill
@@ -48,6 +52,7 @@ import com.playlog.app.ui.components.Kicker
 import com.playlog.app.ui.components.LedgerPanel
 import com.playlog.app.ui.components.PlaylogField
 import com.playlog.app.ui.components.ScreenHeader
+import com.playlog.app.ui.components.TagRow
 import com.playlog.app.ui.components.dayLabel
 import com.playlog.app.ui.theme.Accent
 import com.playlog.app.ui.theme.GlassBorder
@@ -80,10 +85,22 @@ fun LogScreen(
     }
 
     val existing = snapshot.entry(game.id)
+    val previous = remember(game.id) {
+        snapshot.diary.filter { it.gameId == game.id }.maxByOrNull { it.playedAt }
+    }
     var status by remember(game.id) { mutableStateOf(existing?.playStatus ?: PlayStatus.PLAYED) }
     var rating by remember(game.id) { mutableStateOf(existing?.rating) }
     var review by remember(game.id) { mutableStateOf("") }
     var isReplay by remember(game.id) { mutableStateOf(false) }
+    var platform by remember(game.id) { mutableStateOf(previous?.platform) }
+    var completion by remember(game.id) { mutableStateOf(Completion.from(previous?.completion)) }
+    var playtimeText by remember(game.id) {
+        mutableStateOf(previous?.playtimeHours?.let { formatHoursValue(it) }.orEmpty())
+    }
+    var tagsText by remember(game.id) {
+        mutableStateOf(previous?.tags?.joinToString(", ").orEmpty())
+    }
+    val parsedTags = parseTags(tagsText)
     val playedAt = remember { System.currentTimeMillis() }
 
     Column(
@@ -160,6 +177,106 @@ fun LogScreen(
             Spacer(Modifier.height(28.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Kicker("Details")
+                Text(
+                    text = "Optional",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Sage.copy(alpha = 0.7f),
+                )
+            }
+            Spacer(Modifier.height(14.dp))
+
+            DetailLabel("Platform")
+            Spacer(Modifier.height(9.dp))
+            if (game.platforms.isNotEmpty()) {
+                // Keep a previously saved platform visible even when it is not in
+                // this game's IGDB platform list, so re-logging does not hide it.
+                val options = buildList {
+                    platform?.takeIf { saved -> game.platforms.none { it == saved } }?.let { add(it) }
+                    addAll(game.platforms.distinct())
+                }
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    options.forEach { option ->
+                        FilterPill(
+                            text = option,
+                            selected = platform == option,
+                            onClick = { platform = if (platform == option) null else option },
+                        )
+                    }
+                }
+            } else {
+                PlaylogField(
+                    value = platform.orEmpty(),
+                    onValueChange = { platform = it.take(60).ifBlank { null } },
+                    placeholder = "PC, PS5, Switch…",
+                )
+            }
+
+            Spacer(Modifier.height(22.dp))
+            DetailLabel("Completion")
+            Spacer(Modifier.height(9.dp))
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Completion.entries.forEach { option ->
+                    FilterPill(
+                        text = option.label,
+                        selected = completion == option,
+                        onClick = { completion = if (completion == option) null else option },
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(22.dp))
+            DetailLabel("Hours played")
+            Spacer(Modifier.height(9.dp))
+            PlaylogField(
+                value = playtimeText,
+                onValueChange = { raw ->
+                    val cleaned = raw.replace(',', '.').filter { it.isDigit() || it == '.' }
+                    if (cleaned.count { it == '.' } <= 1 && cleaned.count { it.isDigit() } <= 5) {
+                        playtimeText = cleaned
+                    }
+                },
+                placeholder = "e.g. 12.5",
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Decimal,
+                    imeAction = ImeAction.Next,
+                ),
+            )
+
+            Spacer(Modifier.height(22.dp))
+            DetailLabel("Tags")
+            Spacer(Modifier.height(9.dp))
+            PlaylogField(
+                value = tagsText,
+                onValueChange = { tagsText = it.take(200) },
+                placeholder = "co-op, comfort, 100% run",
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            )
+            if (parsedTags.isNotEmpty()) {
+                Spacer(Modifier.height(9.dp))
+                TagRow(parsedTags)
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = "Comma separated · up to 8 tags · 24 characters each",
+                style = MaterialTheme.typography.bodySmall,
+                color = Sage.copy(alpha = 0.8f),
+            )
+
+            Spacer(Modifier.height(28.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -250,7 +367,18 @@ fun LogScreen(
             GlossyPillButton(
                 text = "Save entry",
                 onClick = {
-                    vm.saveLog(game, status, rating, review, isReplay, playedAt)
+                    vm.saveLog(
+                        game = game,
+                        status = status,
+                        rating = rating,
+                        review = review,
+                        isReplay = isReplay,
+                        playedAt = playedAt,
+                        platform = platform,
+                        playtimeHours = playtimeText.toDoubleOrNull()?.takeIf { it in 0.0..9999.9 },
+                        completion = completion,
+                        tags = parsedTags,
+                    )
                     onSaved()
                 },
                 modifier = Modifier.fillMaxWidth(),
@@ -278,4 +406,13 @@ fun LogScreen(
             Spacer(Modifier.height(34.dp))
         }
     }
+}
+
+@Composable
+private fun DetailLabel(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelMedium,
+        color = MintWhite.copy(alpha = 0.85f),
+    )
 }

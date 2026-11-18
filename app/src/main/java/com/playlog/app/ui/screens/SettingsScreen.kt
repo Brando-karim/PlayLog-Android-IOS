@@ -42,7 +42,7 @@ import com.playlog.app.ui.components.Hairline
 import com.playlog.app.ui.components.Kicker
 import com.playlog.app.ui.components.LedgerPanel
 import com.playlog.app.ui.components.PlaylogDialog
-import com.playlog.app.ui.components.PlaylogField
+import com.playlog.app.ui.components.ProfileAvatar
 import com.playlog.app.ui.components.ScreenHeader
 import com.playlog.app.ui.components.Wordmark
 import com.playlog.app.ui.theme.Accent
@@ -56,9 +56,11 @@ import com.playlog.app.ui.theme.Teal
 fun SettingsScreen(
     vm: PlaylogViewModel,
     onBack: () -> Unit,
+    onAccount: () -> Unit,
+    onEditProfile: () -> Unit,
 ) {
     val snapshot by vm.state.collectAsStateWithLifecycle()
-    var editingName by remember { mutableStateOf(false) }
+    val account by vm.account.collectAsStateWithLifecycle()
     var confirmClear by remember { mutableStateOf(false) }
 
     Column(
@@ -74,6 +76,49 @@ fun SettingsScreen(
 
         Column(Modifier.padding(horizontal = 20.dp)) {
             Spacer(Modifier.height(12.dp))
+
+            SettingsSection("Cloud sync") {
+                LedgerPanel(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                text = "Account & sync",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MintWhite,
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                text = if (account.signedIn) {
+                                    account.email.orEmpty().ifBlank { "Signed in" }
+                                } else {
+                                    "Not signed in · data stays on this device"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (account.signedIn) Accent else Sage,
+                            )
+                        }
+                        GhostPill(
+                            text = if (account.signedIn) "Manage" else "Sign in",
+                            onClick = onAccount,
+                        )
+                    }
+                    if (account.signedIn) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = when {
+                                account.busy -> "Syncing…"
+                                account.lastSync != null -> "Your web and mobile ledgers are linked."
+                                else -> "Sign in is complete. Run a sync to pull your web data."
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Sage,
+                        )
+                    }
+                }
+            }
 
             SettingsSection("Data source") {
                 LedgerPanel(
@@ -150,9 +195,15 @@ fun SettingsScreen(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        ProfileAvatar(
+                            name = snapshot.displayName,
+                            avatarUrl = snapshot.avatarUrl,
+                            size = 42.dp,
+                        )
+                        Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
                             Text(
-                                text = "Display name",
+                                text = "Display name & photo",
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MintWhite,
                             )
@@ -165,7 +216,7 @@ fun SettingsScreen(
                         }
                         GhostPill(
                             text = "Edit",
-                            onClick = { editingName = true },
+                            onClick = onEditProfile,
                             icon = androidx.compose.ui.res.painterResource(com.playlog.app.R.drawable.ic_edit),
                         )
                     }
@@ -186,7 +237,7 @@ fun SettingsScreen(
                             )
                             Spacer(Modifier.height(2.dp))
                             Text(
-                                text = "${snapshot.library.size} games · ${snapshot.diary.size} diary entries",
+                                text = "${snapshot.library.size} ${if (snapshot.library.size == 1) "game" else "games"} · ${snapshot.diary.size} ${if (snapshot.diary.size == 1) "diary entry" else "diary entries"}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = Sage,
                             )
@@ -225,7 +276,7 @@ fun SettingsScreen(
                     )
                     Spacer(Modifier.height(9.dp))
                     Text(
-                        text = "Game metadata by IGDB. All personal data is stored locally on this device.",
+                        text = "Game metadata by IGDB. Personal data is stored locally on this device; sign in to mirror it to your Playlog account.",
                         style = MaterialTheme.typography.bodySmall,
                         color = Sage,
                     )
@@ -239,30 +290,6 @@ fun SettingsScreen(
             }
 
             Spacer(Modifier.height(36.dp))
-        }
-    }
-
-    if (editingName) {
-        var name by remember { mutableStateOf(snapshot.displayName) }
-        PlaylogDialog(
-            onDismissRequest = { editingName = false },
-            title = "Display name",
-            confirmButton = {
-                TextButton(onClick = {
-                    vm.setDisplayName(name)
-                    editingName = false
-                }) { Text("Save", color = Accent) }
-            },
-            dismissButton = {
-                TextButton(onClick = { editingName = false }) { Text("Cancel", color = Sage) }
-            },
-        ) {
-            PlaylogField(
-                value = name,
-                onValueChange = { name = it },
-                label = "Name",
-                singleLine = true,
-            )
         }
     }
 
@@ -281,7 +308,7 @@ fun SettingsScreen(
             },
         ) {
             Text(
-                text = "This deletes your library, diary, and favourites from this device. Lists stay.",
+                text = "This deletes your library, diary, and favourites from this device and, if signed in, from your Playlog account. Lists stay.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = Sage,
             )
